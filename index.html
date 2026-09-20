@@ -3,86 +3,50 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Morph 3D - El Planeta del Tesoro</title>
+  <title>Morph - El Planeta del Tesoro 3D</title>
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: radial-gradient(circle at center, #1b0c30 0%, #05020a 100%);
-      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-
-    #canvas-container {
-      width: 100vw;
-      height: 100vh;
-      display: block;
-    }
-
-    .ui-container {
-      position: absolute;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      pointer-events: none;
-      width: 90%;
-      max-width: 400px;
-    }
-
-    .dialog-box {
-      background: rgba(255, 255, 255, 0.12);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      border-radius: 20px;
-      padding: 12px 24px;
-      color: #fff;
-      font-size: 1.1rem;
-      font-weight: 600;
-      text-align: center;
-      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-      transition: all 0.3s ease;
-      margin-bottom: 8px;
-    }
-
-    .hint {
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; touch-action: none; }
+    body { margin: 0; padding: 0; overflow: hidden; background: radial-gradient(circle at 50% 30%, #4a0072 0%, #03000a 100%); font-family: system-ui, -apple-system, sans-serif; }
+    #canvas-container { width: 100vw; height: 100vh; display: block; }
+    .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 30px 20px; }
+    .badge { background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 20px; padding: 8px 18px; color: #ffdaf7; font-size: 0.85rem; letter-spacing: 2px; text-transform: uppercase; font-weight: 900; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+    .dialog-box { background: rgba(255, 255, 255, 0.22); backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px); border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 32px; padding: 18px 36px; color: #fff; font-size: 1.35rem; font-weight: 800; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.8); pointer-events: auto; cursor: pointer; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    .dialog-box:active { transform: scale(0.94); }
+    .controls-hint { color: rgba(255, 255, 255, 0.7); font-size: 0.8rem; margin-top: 10px; text-align: center; font-weight: 500; }
   </style>
-
-  <!-- Librería Three.js para renderizado 3D -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-
   <div id="canvas-container"></div>
-
-  <div class="ui-container">
-    <div class="dialog-box" id="dialog">¡*Bloop!* Tocame o mueve tu teléfono</div>
-    <div class="hint">Interactúa con Morph 3D</div>
+  <div class="ui-layer">
+    <div class="badge">Morph: Treasure Planet Edition</div>
+    <div>
+      <div class="dialog-box" id="dialog" onclick="triggerTransform()">¡Ahoj! ¡Haz clic para transformarme! 🚀</div>
+      <div class="controls-hint">Geometría Orgánica • Ruido Simplex Flotante • Físicas de Gelatina</div>
+    </div>
   </div>
 
   <script>
-    let scene, camera, renderer, morphMesh, eyeLeft, eyeRight, pupilLeft, pupilRight;
+    let scene, camera, renderer, morphGroup, bodyMesh, shadowMesh, particleSystem, sparkParticles, ambientLight;
+    let eyeLeft, eyeRight, pupilLeft, pupilRight;
     let clock = new THREE.Clock();
-    let originalPositions = [];
-    let touchTarget = { x: 0, y: 0 };
-    let squishFactor = 0;
+
+    let basePositions = [], blobShapes = [];
+    let currentShape = 0, shapeTransition = 0;
+
+    let pos = new THREE.Vector2(0, 0), vel = new THREE.Vector2(0, 0);
+    let isDragging = false, lastMousePos = new THREE.Vector2(), dragHistory = [];
+
+    let squishX = { v: 0, x: 0 }, squishY = { v: 0, x: 0 };
+    let blinkProgress = 0;
+
+    let sparkPositions = [], sparkVelocities = [];
+    const SPARK_COUNT = 90;
 
     const dialogs = [
-      "¡*Bloop bloop!* 🫧",
-      "¡Soy un mapa! 📜",
-      "¡Mira una estrella! ⭐",
-      "¡Guaaah! 😮",
-      "¡*Prrr...* (girando) ✨"
+      { text: "¡Morph Gelatinoso! 💖", shape: 0, color: 0xff40ac },
+      { text: "¡Gota del Espacio! 💧", shape: 1, color: 0x40e0ff },
+      { text: "¡Estrella de Etherium! ⭐", shape: 2, color: 0xffd040 }
     ];
 
     init();
@@ -90,197 +54,228 @@
 
     function init() {
       const container = document.getElementById('canvas-container');
-
-      // 1. Escena y Cámara
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-      camera.position.z = 7;
+      camera.position.set(0, 0, 7.5);
 
-      // 2. Renderizador
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.35;
       container.appendChild(renderer.domElement);
 
-      // 3. Iluminación Estilo Espacial
-      const ambientLight = new THREE.AmbientLight(0xffb7eb, 0.8);
+      ambientLight = new THREE.AmbientLight(0xff60c0, 1.9);
       scene.add(ambientLight);
 
-      const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
-      mainLight.position.set(5, 5, 5);
+      const mainLight = new THREE.DirectionalLight(0xffffff, 3.2);
+      mainLight.position.set(5, 10, 7);
       scene.add(mainLight);
 
-      const rimLight = new THREE.PointLight(0xff55b1, 3, 10);
-      rimLight.position.set(-5, -2, -2);
-      scene.add(rimLight);
+      const backLight = new THREE.DirectionalLight(0x00ffff, 2.5);
+      backLight.position.set(-5, -5, -5);
+      scene.add(backLight);
 
-      // 4. Crear cuerpo de Morph (Gelatina Orgánica)
-      const geometry = new THREE.IcosahedronGeometry(1.6, 32);
-      
-      // Guardar posiciones originales de vértices para deformación física
-      const posAttribute = geometry.attributes.position;
-      for (let i = 0; i < posAttribute.count; i++) {
-        originalPositions.push(new THREE.Vector3(
-          posAttribute.getX(i),
-          posAttribute.getY(i),
-          posAttribute.getZ(i)
-        ));
+      morphGroup = new THREE.Group();
+      scene.add(morphGroup);
+
+      // Malla base ultra-suave para simular el cuerpo fluido de Morph
+      const geometry = new THREE.SphereGeometry(1.4, 64, 64);
+      const posAttr = geometry.attributes.position;
+
+      for (let i = 0; i < posAttr.count; i++) {
+        const v = new THREE.Vector3(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+        basePositions.push(v.clone());
+
+        // Forma 1: Morph Clásico con protuberancias superiores tipo "orejitas/tentáculos"
+        let morphForm = v.clone();
+        if (v.y > 0.3) {
+          morphForm.x *= 1.25 + 0.2 * Math.sin(v.y * 8);
+          morphForm.y *= 1.15;
+        }
+        blobShapes.push(morphForm);
       }
 
-      // Material translúcido y brillante (Estilo Vidrio/Gelatina Rosa)
       const material = new THREE.MeshPhysicalMaterial({
-        color: 0xeb3b94,
-        emissive: 0x5a0033,
-        roughness: 0.1,
-        metalness: 0.1,
-        transmission: 0.6,
+        color: 0xff2e9e,
+        emissive: 0x880044,
+        roughness: 0.05,
+        metalness: 0.0,
+        transmission: 0.9,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.96,
         clearcoat: 1.0,
-        clearcoatRoughness: 0.1,
-        ior: 1.33
+        clearcoatRoughness: 0.02,
+        ior: 1.45
       });
 
-      morphMesh = new THREE.Mesh(geometry, material);
-      scene.add(morphMesh);
+      bodyMesh = new THREE.Mesh(geometry, material);
+      morphGroup.add(bodyMesh);
 
-      // 5. Crear Ojos 3D
-      const eyeGeo = new THREE.SphereGeometry(0.35, 32, 32);
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xfff8d1 });
+      // Ojos estilo animación 2D/3D (Estilo Planeta del Tesoro)
+      const eyeGeo = new THREE.SphereGeometry(0.38, 32, 32);
+      const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05 });
+      const pupilGeo = new THREE.SphereGeometry(0.18, 32, 32);
+      const pupilMat = new THREE.MeshBasicMaterial({ color: 0x0a0300 });
 
-      const pupilGeo = new THREE.SphereGeometry(0.15, 32, 32);
-      const pupilMat = new THREE.MeshBasicMaterial({ color: 0x1a0f00 });
-
-      // Ojo Izquierdo
       eyeLeft = new THREE.Mesh(eyeGeo, eyeMat);
-      eyeLeft.position.set(-0.55, 0.4, 1.3);
-      eyeLeft.scale.set(1, 1.2, 0.8);
-      morphMesh.add(eyeLeft);
+      eyeLeft.position.set(-0.45, 0.35, 1.15);
+      eyeLeft.scale.set(1, 1.2, 0.7);
+      morphGroup.add(eyeLeft);
 
       pupilLeft = new THREE.Mesh(pupilGeo, pupilMat);
-      pupilLeft.position.set(0, 0, 0.25);
+      pupilLeft.position.set(0, 0, 0.24);
       eyeLeft.add(pupilLeft);
 
-      // Ojo Derecho
       eyeRight = new THREE.Mesh(eyeGeo, eyeMat);
-      eyeRight.position.set(0.55, 0.4, 1.3);
-      eyeRight.scale.set(1, 1.2, 0.8);
-      morphMesh.add(eyeRight);
+      eyeRight.position.set(0.45, 0.35, 1.15);
+      eyeRight.scale.set(1, 1.2, 0.7);
+      morphGroup.add(eyeRight);
 
       pupilRight = new THREE.Mesh(pupilGeo, pupilMat);
-      pupilRight.position.set(0, 0, 0.25);
+      pupilRight.position.set(0, 0, 0.24);
       eyeRight.add(pupilRight);
 
-      // Eventos
-      window.addEventListener('resize', onWindowResize);
-      window.addEventListener('pointerdown', onInteract);
-      window.addEventListener('pointermove', onPointerMove);
+      // Sombra
+      const shadowGeo = new THREE.PlaneGeometry(4.0, 4.0);
+      const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false });
+      shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+      shadowMesh.rotation.x = -Math.PI / 2;
+      shadowMesh.position.y = -2.3;
+      scene.add(shadowMesh);
 
-      // Giroscopio en teléfonos
-      if (window.DeviceOrientationEvent) {
-        window.addEventListener('deviceorientation', handleOrientation);
-      }
+      initParticles();
+      initSparks();
+
+      window.addEventListener('resize', onWindowResize);
+      window.addEventListener('pointerdown', onPointerDown);
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
     }
 
-    // Deformación viscosa (Simulación de gelatina)
-    function updateMorphShape(time) {
-      const positionAttribute = morphMesh.geometry.attributes.position;
+    function initParticles() {
+      const pCount = 140;
+      const geo = new THREE.BufferGeometry();
+      const positions = new Float32Array(pCount * 3);
+      for (let i = 0; i < pCount * 3; i += 3) {
+        positions[i] = (Math.random() - 0.5) * 15;
+        positions[i+1] = (Math.random() - 0.5) * 15;
+        positions[i+2] = (Math.random() - 0.5) * 15;
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      particleSystem = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.11, color: 0xffd8fa, transparent: true, opacity: 0.75 }));
+      scene.add(particleSystem);
+    }
 
-      for (let i = 0; i < positionAttribute.count; i++) {
-        const vertex = originalPositions[i].clone();
+    function initSparks() {
+      const geo = new THREE.BufferGeometry();
+      const posArray = new Float32Array(SPARK_COUNT * 3);
+      for (let i = 0; i < SPARK_COUNT; i++) {
+        sparkPositions.push(new THREE.Vector3(0, -100, 0));
+        sparkVelocities.push(new THREE.Vector3());
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+      sparkParticles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.16, color: 0xffffff, transparent: true, opacity: 0.95 }));
+      scene.add(sparkParticles);
+    }
 
-        // Ondulaciones orgánicas en la superficie
-        const wave = Math.sin(time * 3 + vertex.x * 2 + vertex.y * 2) * 0.08;
-        const squish = Math.sin(time * 5) * squishFactor * 0.2;
+    function triggerSparks(x, y, speed = 0.35) {
+      for (let i = 0; i < SPARK_COUNT; i++) {
+        sparkPositions[i].set(x, y, 0);
+        sparkVelocities[i].set((Math.random() - 0.5) * speed, (Math.random() - 0.5) * speed, (Math.random() - 0.5) * speed);
+      }
+      if (navigator.vibrate) navigator.vibrate(15);
+    }
 
-        vertex.multiplyScalar(1 + wave + squish);
+    function updateSparks() {
+      const posAttr = sparkParticles.geometry.attributes.position;
+      for (let i = 0; i < SPARK_COUNT; i++) {
+        sparkPositions[i].add(sparkVelocities[i]);
+        sparkVelocities[i].multiplyScalar(0.9);
+        posAttr.setXYZ(i, sparkPositions[i].x, sparkPositions[i].y, sparkPositions[i].z);
+      }
+      posAttr.needsUpdate = true;
+    }
 
-        positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+    function triggerTransform() {
+      currentShape = (currentShape + 1) % 3;
+      shapeTransition = 0;
+      squishX.v = 1.8; squishY.v = 1.8;
+      const info = dialogs[currentShape];
+      document.getElementById('dialog').innerText = info.text;
+      ambientLight.color.setHex(info.color);
+      triggerSparks(pos.x, pos.y, 0.5);
+      playMorphSound(750, 0.25, pos.x);
+    }
+
+    function updatePhysics() {
+      if (!isDragging) {
+        vel.y -= 0.009;
+        pos.add(vel);
+        const boundsX = 2.2, boundsY = 1.8;
+
+        if (Math.abs(pos.x) > boundsX) {
+          pos.x = Math.sign(pos.x) * boundsX;
+          vel.x *= -0.72; squishX.v = Math.abs(vel.x) * 2.2;
+          triggerSparks(pos.x, pos.y);
+          playMorphSound(380 + Math.abs(vel.x) * 600, 0.18, pos.x);
+        }
+        if (pos.y < -boundsY) {
+          pos.y = -boundsY;
+          vel.y *= -0.72; vel.x *= 0.88; squishY.v = Math.abs(vel.y) * 2.5;
+          triggerSparks(pos.x, pos.y);
+          playMorphSound(280 + Math.abs(vel.y) * 700, 0.22, pos.x);
+        } else if (pos.y > boundsY) {
+          pos.y = boundsY; vel.y *= -0.6; triggerSparks(pos.x, pos.y);
+        }
       }
 
-      morphMesh.geometry.attributes.position.needsUpdate = true;
-      morphMesh.geometry.computeVertexNormals();
+      const k = 0.18, d = 0.8;
+      squishX.v = (squishX.v - k * squishX.x) * d; squishX.x += squishX.v;
+      squishY.v = (squishY.v - k * squishY.x) * d; squishY.x += squishY.v;
+    }
 
-      // Reducir la deformación gradualmente
-      if (squishFactor > 0) squishFactor -= 0.02;
+    function updateGeometry(time) {
+      const posAttr = bodyMesh.geometry.attributes.position;
+      const speed = vel.length();
+
+      for (let i = 0; i < posAttr.count; i++) {
+        let v = blobShapes[i].clone();
+
+        // Ondulaciones orgánicas estilo gelatina fluida Disney
+        const wave = Math.sin(time * 5.0 + v.x * 3.0 + v.y * 3.0) * (0.08 + speed * 0.12);
+        const blobPulse = Math.cos(time * 3.0 + v.z * 2.0) * 0.05;
+
+        v.x *= (1 + squishX.x * 0.3) + wave + blobPulse;
+        v.y *= (1 / (1 + squishY.x * 0.3)) + wave;
+        v.z *= (1 + squishX.x * 0.15) + blobPulse;
+
+        posAttr.setXYZ(i, v.x, v.y, v.z);
+      }
+      posAttr.needsUpdate = true;
+      bodyMesh.geometry.computeVertexNormals();
     }
 
     function animate() {
       requestAnimationFrame(animate);
-
       const time = clock.getElapsedTime();
 
-      // Flotación constante
-      morphMesh.position.y = Math.sin(time * 2) * 0.15;
-      
-      // Aplicar físicas de deformación
-      updateMorphShape(time);
+      updatePhysics(); updateGeometry(time); updateSparks();
 
-      // Rotación suave hacia el dedo/cursor
-      morphMesh.rotation.y += (touchTarget.x * 0.8 - morphMesh.rotation.y) * 0.05;
-      morphMesh.rotation.x += (-touchTarget.y * 0.8 - morphMesh.rotation.x) * 0.05;
+      morphGroup.position.set(pos.x, pos.y + Math.sin(time * 2.8) * 0.1, 0);
+      morphGroup.rotation.z = -vel.x * 0.85; 
+      morphGroup.rotation.x = vel.y * 0.85;
 
-      // Movimiento de pupilas
-      pupilLeft.position.x = touchTarget.x * 0.1;
-      pupilLeft.position.y = touchTarget.y * 0.1;
-      pupilRight.position.x = touchTarget.x * 0.1;
-      pupilRight.position.y = touchTarget.y * 0.1;
+      shadowMesh.position.x = pos.x;
+      shadowMesh.scale.setScalar(Math.max(0.2, 1 - (pos.y + 1.8) * 0.22));
 
+      blinkProgress += 0.025;
+      eyeLeft.scale.y = eyeRight.scale.y = Math.sin(blinkProgress) > 0.98 ? 0.08 : 1.2;
+
+      particleSystem.rotation.y = time * 0.05;
       renderer.render(scene, camera);
     }
 
-    // Interacción al tocar la pantalla
-    function onInteract(e) {
-      squishFactor = 1.5; // Provoca la deformación de gelatina
-
-      // Cambiar texto de la UI
-      const randomDialog = dialogs[Math.floor(Math.random() * dialogs.length)];
-      document.getElementById('dialog').innerText = randomDialog;
-
-      // Sonido de Bloop sintetizado (Web Audio API)
-      playBloop();
-    }
-
-    function onPointerMove(e) {
-      touchTarget.x = (e.clientX / window.innerWidth) * 2 - 1;
-      touchTarget.y = -(e.clientY / window.innerHeight) * 2 + 1;
-    }
-
-    function handleOrientation(e) {
-      if (e.beta && e.gamma) {
-        touchTarget.x = e.gamma / 30; // Inclinación izquierda/derecha
-        touchTarget.y = (e.beta - 45) / 30; // Inclinación adelante/atrás
-      }
-    }
-
-    function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-
-    // Generador de sonido líquido en tiempo real
-    function playBloop() {
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(250 + Math.random() * 200, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(800 + Math.random() * 300, audioCtx.currentTime + 0.12);
-
-        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
-
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.12);
-      } catch (err) {}
-    }
-  </script>
-</body>
-</html>
+    function onPointerDown(e) {
+      isDragging = true; vel.set(0, 0);
+      lastMousePos.set(e.clientX, e
