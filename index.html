@@ -2,230 +2,284 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Morph - Tu compañero gelatinoso</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Morph 3D - El Planeta del Tesoro</title>
   <style>
-    :root {
-      --morph-color: #e052a0;
-      --morph-glow: #ff85c8;
-    }
-
     body {
       margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #1b0c30 0%, #05020a 100%);
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #canvas-container {
+      width: 100vw;
       height: 100vh;
-      background: radial-gradient(circle, #1a103c 0%, #080314 100%);
+      display: block;
+    }
+
+    .ui-container {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      overflow: hidden;
-      color: white;
+      pointer-events: none;
+      width: 90%;
+      max-width: 400px;
     }
 
-    /* Contenedor del personaje */
-    .stage {
-      position: relative;
-      width: 250px;
-      height: 250px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      cursor: pointer;
-    }
-
-    /* Cuerpo viscoso de Morph */
-    .morph {
-      position: relative;
-      width: 140px;
-      height: 150px;
-      background: radial-gradient(circle at 30% 30%, #ff9ebb, var(--morph-color), #8a135c);
-      border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
-      box-shadow: 0 0 30px var(--morph-glow), inset 0 0 15px rgba(255, 255, 255, 0.6);
-      animation: float 4s ease-in-out infinite, squish 2s ease-in-out infinite alternate;
-      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-
-    /* Ojos */
-    .eyes {
-      position: absolute;
-      top: 35px;
-      width: 100%;
-      display: flex;
-      justify-content: space-evenly;
-      padding: 0 20px;
-      box-sizing: border-box;
-    }
-
-    .eye {
-      width: 30px;
-      height: 38px;
-      background: #fffbcf;
-      border-radius: 50%;
-      position: relative;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
-    }
-
-    .pupil {
-      width: 12px;
-      height: 14px;
-      background: #2b1f00;
-      border-radius: 50%;
-      transition: transform 0.1s ease;
-    }
-
-    /* Boca */
-    .mouth {
-      position: absolute;
-      top: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 20px;
-      height: 10px;
-      background: #50062c;
-      border-radius: 0 0 10px 10px;
-      transition: all 0.2s ease;
-    }
-
-    /* Formas de transformación (Clases dinámicas) */
-    .morph.star {
-      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-      border-radius: 0;
-    }
-
-    .morph.map {
-      width: 180px;
-      height: 100px;
-      border-radius: 10px;
-    }
-
-    /* Animaciones base */
-    @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-20px); }
-    }
-
-    @keyframes squish {
-      0% { border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%; }
-      100% { border-radius: 45% 45% 55% 55% / 50% 50% 50% 50%; }
-    }
-
-    /* Interfaz de diálogo */
     .dialog-box {
-      margin-top: 30px;
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      padding: 15px 25px;
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
       border-radius: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 12px 24px;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 600;
       text-align: center;
-      font-size: 1.2rem;
-      min-height: 30px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      transition: all 0.3s ease;
+      margin-bottom: 8px;
     }
 
     .hint {
-      margin-top: 15px;
+      color: rgba(255, 255, 255, 0.6);
       font-size: 0.8rem;
-      opacity: 0.6;
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
   </style>
+
+  <!-- Librería Three.js para renderizado 3D -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-  <div class="stage" onclick="transformMorph()">
-    <div class="morph" id="morph">
-      <div class="eyes">
-        <div class="eye"><div class="pupil" id="pupil1"></div></div>
-        <div class="eye"><div class="pupil" id="pupil2"></div></div>
-      </div>
-      <div class="mouth" id="mouth"></div>
-    </div>
+  <div id="canvas-container"></div>
+
+  <div class="ui-container">
+    <div class="dialog-box" id="dialog">¡*Bloop!* Tocame o mueve tu teléfono</div>
+    <div class="hint">Interactúa con Morph 3D</div>
   </div>
 
-  <div class="dialog-box" id="dialog">¡*Bloop!* ¡Hola!</div>
-  <div class="hint">Toca a Morph para que interactúe contigo</div>
-
   <script>
-    const morph = document.getElementById('morph');
-    const dialog = document.getElementById('dialog');
-    const mouth = document.getElementById('mouth');
-    const pupil1 = document.getElementById('pupil1');
-    const pupil2 = document.getElementById('pupil2');
+    let scene, camera, renderer, morphMesh, eyeLeft, eyeRight, pupilLeft, pupilRight;
+    let clock = new THREE.Clock();
+    let originalPositions = [];
+    let touchTarget = { x: 0, y: 0 };
+    let squishFactor = 0;
 
-    // Sonidos y transformaciones estilo "El Planeta del Tesoro"
-    const behaviors = [
-      { text: "¡*Bloop bloop!* 🫧", shape: "", mouthStyle: "height: 12px; width: 22px; border-radius: 50%;" },
-      { text: "¡Soy un mapa del tesoro! 📜", shape: "map", mouthStyle: "height: 5px; width: 30px;" },
-      { text: "¡Mira, una estrella! ⭐", shape: "star", mouthStyle: "height: 15px; width: 15px; border-radius: 50%;" },
-      { text: "¡Guaaah! 😮", shape: "", mouthStyle: "height: 25px; width: 20px; border-radius: 50%;" },
-      { text: "*Prrr...* (se acurruca)", shape: "", mouthStyle: "height: 4px; width: 15px;" }
+    const dialogs = [
+      "¡*Bloop bloop!* 🫧",
+      "¡Soy un mapa! 📜",
+      "¡Mira una estrella! ⭐",
+      "¡Guaaah! 😮",
+      "¡*Prrr...* (girando) ✨"
     ];
 
-    // Animación de ojos siguiendo el movimiento
-    window.addEventListener('mousemove', (e) => {
-      movePupils(e.clientX, e.clientY);
-    });
+    init();
+    animate();
 
-    window.addEventListener('touchmove', (e) => {
-      if(e.touches.length > 0) {
-        movePupils(e.touches[0].clientX, e.touches[0].clientY);
+    function init() {
+      const container = document.getElementById('canvas-container');
+
+      // 1. Escena y Cámara
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.z = 7;
+
+      // 2. Renderizador
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      container.appendChild(renderer.domElement);
+
+      // 3. Iluminación Estilo Espacial
+      const ambientLight = new THREE.AmbientLight(0xffb7eb, 0.8);
+      scene.add(ambientLight);
+
+      const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
+      mainLight.position.set(5, 5, 5);
+      scene.add(mainLight);
+
+      const rimLight = new THREE.PointLight(0xff55b1, 3, 10);
+      rimLight.position.set(-5, -2, -2);
+      scene.add(rimLight);
+
+      // 4. Crear cuerpo de Morph (Gelatina Orgánica)
+      const geometry = new THREE.IcosahedronGeometry(1.6, 32);
+      
+      // Guardar posiciones originales de vértices para deformación física
+      const posAttribute = geometry.attributes.position;
+      for (let i = 0; i < posAttribute.count; i++) {
+        originalPositions.push(new THREE.Vector3(
+          posAttribute.getX(i),
+          posAttribute.getY(i),
+          posAttribute.getZ(i)
+        ));
       }
-    });
 
-    function movePupils(x, y) {
-      const rect = morph.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      
-      const moveX = (x - centerX) / 25;
-      const moveY = (y - centerY) / 25;
+      // Material translúcido y brillante (Estilo Vidrio/Gelatina Rosa)
+      const material = new THREE.MeshPhysicalMaterial({
+        color: 0xeb3b94,
+        emissive: 0x5a0033,
+        roughness: 0.1,
+        metalness: 0.1,
+        transmission: 0.6,
+        transparent: true,
+        opacity: 0.9,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.1,
+        ior: 1.33
+      });
 
-      pupil1.style.transform = `translate(${moveX}px, ${moveY}px)`;
-      pupil2.style.transform = `translate(${moveX}px, ${moveY}px)`;
+      morphMesh = new THREE.Mesh(geometry, material);
+      scene.add(morphMesh);
+
+      // 5. Crear Ojos 3D
+      const eyeGeo = new THREE.SphereGeometry(0.35, 32, 32);
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xfff8d1 });
+
+      const pupilGeo = new THREE.SphereGeometry(0.15, 32, 32);
+      const pupilMat = new THREE.MeshBasicMaterial({ color: 0x1a0f00 });
+
+      // Ojo Izquierdo
+      eyeLeft = new THREE.Mesh(eyeGeo, eyeMat);
+      eyeLeft.position.set(-0.55, 0.4, 1.3);
+      eyeLeft.scale.set(1, 1.2, 0.8);
+      morphMesh.add(eyeLeft);
+
+      pupilLeft = new THREE.Mesh(pupilGeo, pupilMat);
+      pupilLeft.position.set(0, 0, 0.25);
+      eyeLeft.add(pupilLeft);
+
+      // Ojo Derecho
+      eyeRight = new THREE.Mesh(eyeGeo, eyeMat);
+      eyeRight.position.set(0.55, 0.4, 1.3);
+      eyeRight.scale.set(1, 1.2, 0.8);
+      morphMesh.add(eyeRight);
+
+      pupilRight = new THREE.Mesh(pupilGeo, pupilMat);
+      pupilRight.position.set(0, 0, 0.25);
+      eyeRight.add(pupilRight);
+
+      // Eventos
+      window.addEventListener('resize', onWindowResize);
+      window.addEventListener('pointerdown', onInteract);
+      window.addEventListener('pointermove', onPointerMove);
+
+      // Giroscopio en teléfonos
+      if (window.DeviceOrientationEvent) {
+        window.addEventListener('deviceorientation', handleOrientation);
+      }
     }
 
-    // Cambiar de forma y actuar al tocar
-    function transformMorph() {
-      const randomAction = behaviors[Math.floor(Math.random() * behaviors.length)];
-      
-      // Aplicar animación de rebote extra al tocar
-      morph.style.transform = "scale(1.3)";
-      setTimeout(() => morph.style.transform = "", 200);
+    // Deformación viscosa (Simulación de gelatina)
+    function updateMorphShape(time) {
+      const positionAttribute = morphMesh.geometry.attributes.position;
 
-      // Cambiar forma y texto
-      morph.className = "morph " + randomAction.shape;
-      dialog.textContent = randomAction.text;
-      mouth.style.cssText = randomAction.mouthStyle;
+      for (let i = 0; i < positionAttribute.count; i++) {
+        const vertex = originalPositions[i].clone();
 
-      // Efecto de sonido sintetizado estilo "Bloop"
-      playBloopSound();
+        // Ondulaciones orgánicas en la superficie
+        const wave = Math.sin(time * 3 + vertex.x * 2 + vertex.y * 2) * 0.08;
+        const squish = Math.sin(time * 5) * squishFactor * 0.2;
+
+        vertex.multiplyScalar(1 + wave + squish);
+
+        positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+      }
+
+      morphMesh.geometry.attributes.position.needsUpdate = true;
+      morphMesh.geometry.computeVertexNormals();
+
+      // Reducir la deformación gradualmente
+      if (squishFactor > 0) squishFactor -= 0.02;
     }
 
-    // Generar un sonido de "gelatina" con Web Audio API (sin archivos externos)
-    function playBloopSound() {
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const time = clock.getElapsedTime();
+
+      // Flotación constante
+      morphMesh.position.y = Math.sin(time * 2) * 0.15;
+      
+      // Aplicar físicas de deformación
+      updateMorphShape(time);
+
+      // Rotación suave hacia el dedo/cursor
+      morphMesh.rotation.y += (touchTarget.x * 0.8 - morphMesh.rotation.y) * 0.05;
+      morphMesh.rotation.x += (-touchTarget.y * 0.8 - morphMesh.rotation.x) * 0.05;
+
+      // Movimiento de pupilas
+      pupilLeft.position.x = touchTarget.x * 0.1;
+      pupilLeft.position.y = touchTarget.y * 0.1;
+      pupilRight.position.x = touchTarget.x * 0.1;
+      pupilRight.position.y = touchTarget.y * 0.1;
+
+      renderer.render(scene, camera);
+    }
+
+    // Interacción al tocar la pantalla
+    function onInteract(e) {
+      squishFactor = 1.5; // Provoca la deformación de gelatina
+
+      // Cambiar texto de la UI
+      const randomDialog = dialogs[Math.floor(Math.random() * dialogs.length)];
+      document.getElementById('dialog').innerText = randomDialog;
+
+      // Sonido de Bloop sintetizado (Web Audio API)
+      playBloop();
+    }
+
+    function onPointerMove(e) {
+      touchTarget.x = (e.clientX / window.innerWidth) * 2 - 1;
+      touchTarget.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    }
+
+    function handleOrientation(e) {
+      if (e.beta && e.gamma) {
+        touchTarget.x = e.gamma / 30; // Inclinación izquierda/derecha
+        touchTarget.y = (e.beta - 45) / 30; // Inclinación adelante/atrás
+      }
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // Generador de sonido líquido en tiempo real
+    function playBloop() {
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
 
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.15);
+        osc.frequency.setValueAtTime(250 + Math.random() * 200, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800 + Math.random() * 300, audioCtx.currentTime + 0.12);
 
         gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
 
         osc.connect(gain);
         gain.connect(audioCtx.destination);
 
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.15);
-      } catch(e) {
-        // El audio puede estar bloqueado hasta la primera interacción
-      }
+        osc.stop(audioCtx.currentTime + 0.12);
+      } catch (err) {}
     }
   </script>
 </body>
