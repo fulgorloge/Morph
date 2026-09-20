@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Morph - Tu compañero gelatinoso</title>
+  <style>
+    :root {
+      --morph-color: #e052a0;
+      --morph-glow: #ff85c8;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      background: radial-gradient(circle, #1a103c 0%, #080314 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+      color: white;
+    }
+
+    /* Contenedor del personaje */
+    .stage {
+      position: relative;
+      width: 250px;
+      height: 250px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    /* Cuerpo viscoso de Morph */
+    .morph {
+      position: relative;
+      width: 140px;
+      height: 150px;
+      background: radial-gradient(circle at 30% 30%, #ff9ebb, var(--morph-color), #8a135c);
+      border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
+      box-shadow: 0 0 30px var(--morph-glow), inset 0 0 15px rgba(255, 255, 255, 0.6);
+      animation: float 4s ease-in-out infinite, squish 2s ease-in-out infinite alternate;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    /* Ojos */
+    .eyes {
+      position: absolute;
+      top: 35px;
+      width: 100%;
+      display: flex;
+      justify-content: space-evenly;
+      padding: 0 20px;
+      box-sizing: border-box;
+    }
+
+    .eye {
+      width: 30px;
+      height: 38px;
+      background: #fffbcf;
+      border-radius: 50%;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+    }
+
+    .pupil {
+      width: 12px;
+      height: 14px;
+      background: #2b1f00;
+      border-radius: 50%;
+      transition: transform 0.1s ease;
+    }
+
+    /* Boca */
+    .mouth {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 10px;
+      background: #50062c;
+      border-radius: 0 0 10px 10px;
+      transition: all 0.2s ease;
+    }
+
+    /* Formas de transformación (Clases dinámicas) */
+    .morph.star {
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+      border-radius: 0;
+    }
+
+    .morph.map {
+      width: 180px;
+      height: 100px;
+      border-radius: 10px;
+    }
+
+    /* Animaciones base */
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-20px); }
+    }
+
+    @keyframes squish {
+      0% { border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%; }
+      100% { border-radius: 45% 45% 55% 55% / 50% 50% 50% 50%; }
+    }
+
+    /* Interfaz de diálogo */
+    .dialog-box {
+      margin-top: 30px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      padding: 15px 25px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      text-align: center;
+      font-size: 1.2rem;
+      min-height: 30px;
+    }
+
+    .hint {
+      margin-top: 15px;
+      font-size: 0.8rem;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage" onclick="transformMorph()">
+    <div class="morph" id="morph">
+      <div class="eyes">
+        <div class="eye"><div class="pupil" id="pupil1"></div></div>
+        <div class="eye"><div class="pupil" id="pupil2"></div></div>
+      </div>
+      <div class="mouth" id="mouth"></div>
+    </div>
+  </div>
+
+  <div class="dialog-box" id="dialog">¡*Bloop!* ¡Hola!</div>
+  <div class="hint">Toca a Morph para que interactúe contigo</div>
+
+  <script>
+    const morph = document.getElementById('morph');
+    const dialog = document.getElementById('dialog');
+    const mouth = document.getElementById('mouth');
+    const pupil1 = document.getElementById('pupil1');
+    const pupil2 = document.getElementById('pupil2');
+
+    // Sonidos y transformaciones estilo "El Planeta del Tesoro"
+    const behaviors = [
+      { text: "¡*Bloop bloop!* 🫧", shape: "", mouthStyle: "height: 12px; width: 22px; border-radius: 50%;" },
+      { text: "¡Soy un mapa del tesoro! 📜", shape: "map", mouthStyle: "height: 5px; width: 30px;" },
+      { text: "¡Mira, una estrella! ⭐", shape: "star", mouthStyle: "height: 15px; width: 15px; border-radius: 50%;" },
+      { text: "¡Guaaah! 😮", shape: "", mouthStyle: "height: 25px; width: 20px; border-radius: 50%;" },
+      { text: "*Prrr...* (se acurruca)", shape: "", mouthStyle: "height: 4px; width: 15px;" }
+    ];
+
+    // Animación de ojos siguiendo el movimiento
+    window.addEventListener('mousemove', (e) => {
+      movePupils(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if(e.touches.length > 0) {
+        movePupils(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    });
+
+    function movePupils(x, y) {
+      const rect = morph.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      
+      const moveX = (x - centerX) / 25;
+      const moveY = (y - centerY) / 25;
+
+      pupil1.style.transform = `translate(${moveX}px, ${moveY}px)`;
+      pupil2.style.transform = `translate(${moveX}px, ${moveY}px)`;
+    }
+
+    // Cambiar de forma y actuar al tocar
+    function transformMorph() {
+      const randomAction = behaviors[Math.floor(Math.random() * behaviors.length)];
+      
+      // Aplicar animación de rebote extra al tocar
+      morph.style.transform = "scale(1.3)";
+      setTimeout(() => morph.style.transform = "", 200);
+
+      // Cambiar forma y texto
+      morph.className = "morph " + randomAction.shape;
+      dialog.textContent = randomAction.text;
+      mouth.style.cssText = randomAction.mouthStyle;
+
+      // Efecto de sonido sintetizado estilo "Bloop"
+      playBloopSound();
+    }
+
+    // Generar un sonido de "gelatina" con Web Audio API (sin archivos externos)
+    function playBloopSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.15);
+
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
+      } catch(e) {
+        // El audio puede estar bloqueado hasta la primera interacción
+      }
+    }
+  </script>
+</body>
+</html>
